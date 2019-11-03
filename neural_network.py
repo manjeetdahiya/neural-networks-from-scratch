@@ -2,10 +2,11 @@ import numpy as np
 from collections import defaultdict
 import random
 
+
 class NN:
     def __init__(self, layers=None):
         self.layers = []
-        self.loss = None
+        self.loss_fun = None
         self._layer_count = 0
         self.params = defaultdict(dict)
         for layer in layers:
@@ -25,7 +26,7 @@ class NN:
         self.layers.append(layer)
 
     def set_loss(self, loss):
-        self.loss = loss
+        self.loss_fun = loss
 
     def forward_prop_output(self, input):
         fwd = self.forward_prop(input)
@@ -33,7 +34,7 @@ class NN:
 
     def forward_prop_loss(self, Xs, Ys):
         fwd = self.forward_prop(Xs)
-        return self.loss.loss(fwd[self.layers[-1]._index]['a'], Ys)
+        return self.loss_fun(fwd[self.layers[-1]._index]['a'], Ys)
 
     def forward_prop(self, input):
         forward_prop_output = defaultdict(dict)
@@ -59,7 +60,7 @@ class NN:
             
             if is_last_layer:
                 d_a_z = layer_l.activation_func(z, derivative=True)
-                da = self.loss.loss_derivative(a, y)
+                da = self.loss_fun(a, y, derivative=True)
                 dz = d_a_z * da
             else:
                 dz_l_plus_1 = grads[layer_l_plus_1._index]['dz']
@@ -83,6 +84,13 @@ class NN:
         db = dz  # (units_l x 1)
         dW = np.matmul(a_prev, dz.T)  # (units_l-1 x 1) x (units_l x 1)'
         return (db, dW)
+
+    def iter_params(self):
+        params = self.get_params()
+        for layer_idx in params:
+            for wt_name in params[layer_idx]:
+                for idx in np.ndindex(params[layer_idx][wt_name].shape):
+                    yield (layer_idx, wt_name, idx)
 
     def get_params(self):
         params = defaultdict(dict)
@@ -110,24 +118,22 @@ class NN:
 
     def grad_check(self, Xs, Ys):
         grads = self.back_prop(self.forward_prop(Xs), Xs, Ys)
-        grads_computed = defaultdict(dict)
         delta = 0.00000001
-        for layer in self.layers:
-            for wt_name in layer.params_layer:
-                grads_computed[layer._index]['d'+wt_name] = np.zeros(shape=layer.get_param_W().shape)
-                for idx in np.ndindex(layer.params_layer[wt_name].shape):
-                    wt_old = self.get_param(layer._index, wt_name, idx)
-                    wt_new = wt_old + delta
-                    y_old = self.forward_prop_loss(Xs, Ys)
-                    self.set_param(layer._index, wt_name, idx, wt_new)
-                    y_new = self.forward_prop_loss(Xs, Ys)
-                    grads_computed[layer._index]['d'+wt_name][idx] = (y_new - y_old)/delta
-                    # reset weight 
-                    self.set_param(layer._index, wt_name, idx, wt_old)
-                    A = grads_computed[layer._index]["d"+wt_name][idx] 
-                    B = grads[layer._index]["d"+wt_name][idx]
-                    if abs(A-B) > 0.00001:
-                        print(f'grad check failed: {A}, {B}, {A-B}')
+        
+        for wt_idx in self.iter_params():
+            layer_idx, wt_name, np_idx = wt_idx
+            y_old = self.forward_prop_loss(Xs, Ys)
+            wt_old = self.get_param(*wt_idx)
+            wt_new = wt_old + delta
+            self.set_param(*wt_idx, wt_new)
+            y_new = self.forward_prop_loss(Xs, Ys)
+            A = (y_new - y_old)/delta
+            B = grads[layer_idx]["d"+wt_name][np_idx]
+            if abs(A - B) > 0.00001:
+                print(f'grad check failed: {A}, {B}, {A-B}')
+            
+            # reset weight 
+            self.set_param(*wt_idx, wt_old)
 
 
 class DenseLayer:
@@ -180,56 +186,54 @@ class DenseLayer:
         b = self.activation_func(z, derivative=True)
         return np.multiply(b, a)
 
+class Loss:
+    @staticmethod
+    def cross_entropy(a_last, y, derivative=False):
+        if not derivative:
+            ce = -y * np.log(a_last) - (1 - y) * np.log(1 - a_last)
+            return np.sum(ce)
+        else:
+            da_last = -y/a_last + (1 - y)/(1 - a_last)
+            return da_last
 
-class LossCrossEntropy:
-    def loss(self, a_last, y):
-        ce = -y * np.log(a_last) - (1 - y) * np.log(1 - a_last)
-        return np.sum(ce)
+    @staticmethod
+    def cross_entropy_sigmoid(a_last, y, derivative=False):
+        if not derivative:
+            'a_last is logit'
+            a_last_sm = activations.sigmoid(a_last)
+            ce = -y * np.log(a_last_sm) - (1 - y) * np.log(1 - a_last_sm)
+            assert not np.isnan(ce)
+            return np.sum(ce)
+        else:
+            a_last_sm = activations.sigmoid(a_last)
+            der = a_last_sm - y
+            return der
 
-    def loss_derivative(self, a_last, y):
-        da_last = -y/a_last + (1 - y)/(1 - a_last)
-        return da_last
-
-
-class LossCrossEntropySigmoid:
-    def loss(self, a_last, y):
-        'a_last is logit'
-        a_last_sm = activations.sigmoid(a_last)
-        ce = -y * np.log(a_last_sm) - (1 - y) * np.log(1 - a_last_sm)
-        assert not np.isnan(ce)
-        return np.sum(ce)
-
-    def loss_derivative(self, a_last, y):
-        a_last_sm = activations.sigmoid(a_last)
-        der = a_last_sm - y
-        return der
-
-
-class LossCrossEntropySoftmax:
-    def loss(self, a_last, y):
-        'a_last is logit'
-        a_last_sm = LossCrossEntropySoftmax.softmax(a_last)
-        ce = -y * np.log(a_last_sm)
-        return np.sum(ce)
+    @staticmethod
+    def cross_entropy_softmax(a_last, y, derivative=False):
+        if not derivative:
+            'a_last is logit'
+            a_last_sm = Loss.softmax(a_last)
+            ce = -y * np.log(a_last_sm)
+            return np.sum(ce)
+        else:
+            a_last_sm = Loss.softmax(a_last)
+            der = a_last_sm - y
+            return der
 
     @staticmethod
     def softmax(X):
-        Xrel = X - np.max(X)  # to avoid potential overflow, results remail the same though
+        Xrel = X - np.max(X)  # to avoid potential overflow, results remain the same though
         a = np.exp(Xrel)
         return a/np.sum(a)
 
-    def loss_derivative(self, a_last, y):
-        a_last_sm = LossCrossEntropySoftmax.softmax(a_last)
-        der = a_last_sm - y
-        return der
-
-class LossLinear:
-    def loss(self, a_last, y):
-        ce = a_last - y
-        return np.sum(ce)
-
-    def loss_derivative(self, a_last, y):
-        return 1
+    @staticmethod
+    def linear(a_last, y, derivative=False):
+        if not derivative:
+            ce = a_last - y
+            return np.sum(ce)
+        else:
+            return 1
 
 
 class activations:

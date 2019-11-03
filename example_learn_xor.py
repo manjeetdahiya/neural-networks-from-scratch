@@ -12,7 +12,7 @@ def load_xor_dataset():
 def learn_xor():
     nn = NN([DenseLayer(2, activations.sigmoid, input_dim=2),
             DenseLayer(1, activations.linear)])
-    nn.set_loss(LossCrossEntropySigmoid())
+    nn.set_loss(Loss.cross_entropy_sigmoid)
     nn.init_random_params(seed=10)
 
     (x_train, y_train), _ = load_xor_dataset()
