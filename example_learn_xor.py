@@ -10,15 +10,15 @@ def load_xor_dataset():
     return (x_train, y_train), ()
 
 def learn_xor():
-    nn = NN([DenseLayer(2, activations.sigmoid, input_dim=2),
-            DenseLayer(1, activations.linear)])
+    nn = NN([DenseLayer(2, Activation.sigmoid, input_dim=2),
+            DenseLayer(1, Activation.linear)])
     nn.set_loss(Loss.cross_entropy_sigmoid)
     nn.init_random_params(seed=10)
 
     (x_train, y_train), _ = load_xor_dataset()
 
     opt = StochasticGD(nn, x_train, y_train, x_train, y_train)
-    opt.optimize(step_size=0.1, max_epoch=1000, compute_accuracy=accuracy.bin_class)
+    opt.optimize(step_size=0.1, max_epoch=1000, compute_accuracy=Accuracy.bin_class)
     
     # print probabilities
     for input in x_train:

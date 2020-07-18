@@ -200,12 +200,12 @@ class Loss:
     def cross_entropy_sigmoid(a_last, y, derivative=False):
         if not derivative:
             'a_last is logit'
-            a_last_sm = activations.sigmoid(a_last)
+            a_last_sm = Activation.sigmoid(a_last)
             ce = -y * np.log(a_last_sm) - (1 - y) * np.log(1 - a_last_sm)
             assert not np.isnan(ce)
             return np.sum(ce)
         else:
-            a_last_sm = activations.sigmoid(a_last)
+            a_last_sm = Activation.sigmoid(a_last)
             der = a_last_sm - y
             return der
 
@@ -236,7 +236,7 @@ class Loss:
             return 1
 
 
-class activations:
+class Activation:
     @staticmethod
     def sigmoid(X, derivative=False):
         if not derivative:
@@ -260,7 +260,7 @@ class activations:
             return 1
 
 
-class accuracy:
+class Accuracy:
     @staticmethod
     def multi_class(nn, Xs, Ys):
         preds = 0

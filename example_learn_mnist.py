@@ -2,15 +2,15 @@ from neural_network import *
 from gradient_descent import *
 
 def learn_mnist():
-    nn = NN([DenseLayer(16, activations.relu, input_dim=784),
-            DenseLayer(10, activations.linear)])
+    nn = NN([DenseLayer(16, Activation.relu, input_dim=784),
+            DenseLayer(10, Activation.linear)])
     nn.set_loss(Loss.cross_entropy_softmax)
     nn.init_random_params()
 
     (x_train, y_train), (x_test, y_test) = load_mnist_dataset()
 
     opt = StochasticGD(nn, x_train, y_train, x_test, y_test)
-    opt.optimize(step_size=0.01, max_epoch=100, compute_accuracy=accuracy.multi_class)
+    opt.optimize(step_size=0.01, max_epoch=100, compute_accuracy=Accuracy.multi_class)
 
 
 def load_mnist_dataset():
